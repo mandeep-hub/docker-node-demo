@@ -1,0 +1,12 @@
+{
+  "name": "docker-node-demo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
+}
