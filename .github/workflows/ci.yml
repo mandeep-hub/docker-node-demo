@@ -1,0 +1,94 @@
+name: Docker Node Demo CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: practiceuser
+          POSTGRES_PASSWORD: practicepass
+          POSTGRES_DB: practicedb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U practiceuser -d practicedb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USER: practiceuser
+      DB_PASSWORD: practicepass
+      DB_NAME: practicedb
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Yarn
+        run: npm install --global yarn@1.22.22
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Prepare test database
+        run: |
+          node <<'NODE'
+          const { Pool } = require("pg");
+          const pool = new Pool();
+
+          (async () => {
+            try {
+              await pool.query(`
+                CREATE TABLE products (
+                  id SERIAL PRIMARY KEY,
+                  name TEXT NOT NULL,
+                  quantity INTEGER NOT NULL
+                )
+              `);
+
+              await pool.query(
+                "INSERT INTO products (name, quantity) VALUES ($1, $2)",
+                ["Keyboard", 10]
+              );
+            } finally {
+              await pool.end();
+            }
+          })().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
+
+      - name: Start API
+        run: |
+          node app.js > app.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://localhost:3000/products > /dev/null; then
+              echo "API is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat app.log
+          echo "API failed to start"
+          exit 1
+
+      - name: Run automated tests
+        run: yarn test
