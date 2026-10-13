@@ -48,6 +48,12 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Prepare test database
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: practiceuser
+          DB_PASSWORD: practicepass
+          DB_NAME: practicedb
         run: |
           node <<'NODE'
           const { Pool } = require("pg");
